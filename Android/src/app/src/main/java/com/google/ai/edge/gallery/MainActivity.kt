@@ -19,6 +19,7 @@ package com.google.ai.edge.gallery
 import android.animation.ObjectAnimator
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.view.WindowManager
 import android.view.animation.DecelerateInterpolator
@@ -47,6 +48,7 @@ import androidx.core.animation.doOnEnd
 import androidx.core.os.bundleOf
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
+import com.google.ai.edge.gallery.server.GalleryHttpForegroundService
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
 import com.google.ai.edge.gallery.ui.theme.GalleryTheme
 import com.google.ai.edge.litertlm.ExperimentalApi
@@ -101,6 +103,10 @@ class MainActivity : ComponentActivity() {
     }
 
     modelManagerViewModel.loadModelAllowlist()
+    if (modelManagerViewModel.isOpenAiServerEnabled()) {
+      runCatching { startForegroundService(GalleryHttpForegroundService.createStartIntent(this)) }
+        .onFailure { Log.e(TAG, "Failed to auto-start OpenAI-compatible server.", it) }
+    }
 
     // Show splash screen.
     val splashScreen = installSplashScreen()

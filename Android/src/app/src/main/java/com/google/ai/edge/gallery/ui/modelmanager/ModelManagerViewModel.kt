@@ -52,6 +52,9 @@ import com.google.ai.edge.gallery.data.createLlmChatConfigs
 import com.google.ai.edge.gallery.proto.AccessTokenData
 import com.google.ai.edge.gallery.proto.ImportedModel
 import com.google.ai.edge.gallery.proto.Theme
+import com.google.ai.edge.gallery.server.GalleryHttpForegroundService
+import com.google.ai.edge.gallery.server.SelectedModelStore
+import com.google.ai.edge.gallery.server.ServerConfigStore
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -190,6 +193,8 @@ constructor(
   val dataStoreRepository: DataStoreRepository,
   private val lifecycleProvider: AppLifecycleProvider,
   private val customTasks: Set<@JvmSuppressWildcards CustomTask>,
+  private val selectedModelStore: SelectedModelStore,
+  private val serverConfigStore: ServerConfigStore,
   @ApplicationContext private val context: Context,
 ) : ViewModel() {
   private val externalFilesDir = context.getExternalFilesDir(null)
@@ -271,6 +276,7 @@ constructor(
   }
 
   fun selectModel(model: Model) {
+    selectedModelStore.setSelectedModelName(model.name)
     if (_uiState.value.selectedModel.name != model.name) {
       _uiState.update { _uiState.value.copy(selectedModel = model) }
     }
@@ -538,6 +544,38 @@ constructor(
 
   fun saveThemeOverride(theme: Theme) {
     dataStoreRepository.saveTheme(theme = theme)
+  }
+
+  fun isOpenAiServerEnabled(): Boolean {
+    return serverConfigStore.isEnabled()
+  }
+
+  fun setOpenAiServerEnabled(enabled: Boolean) {
+    serverConfigStore.setEnabled(enabled)
+  }
+
+  fun getOpenAiServerPort(): Int {
+    return serverConfigStore.getPort()
+  }
+
+  fun saveOpenAiServerPort(port: Int) {
+    serverConfigStore.setPort(port)
+  }
+
+  fun getOpenAiServerBearerToken(): String {
+    return serverConfigStore.getBearerToken()
+  }
+
+  fun saveOpenAiServerBearerToken(token: String) {
+    serverConfigStore.setBearerToken(token)
+  }
+
+  fun startOpenAiServer(context: Context) {
+    context.startForegroundService(GalleryHttpForegroundService.createStartIntent(context))
+  }
+
+  fun stopOpenAiServer(context: Context) {
+    context.startService(GalleryHttpForegroundService.createStopIntent(context))
   }
 
   fun getModelUrlResponse(model: Model, accessToken: String? = null): Int {
@@ -1063,7 +1101,20 @@ constructor(
       modelDownloadStatus = modelDownloadStatus,
       modelInitializationStatus = modelInstances,
       textInputHistory = textInputHistory,
+      selectedModel = resolvePersistedSelectedModel(tasks.values),
     )
+  }
+
+  private fun resolvePersistedSelectedModel(tasks: Collection<Task>): Model {
+    val selectedModelName = selectedModelStore.getSelectedModelName() ?: return EMPTY_MODEL
+    for (task in tasks) {
+      for (model in task.models) {
+        if (model.name == selectedModelName) {
+          return model
+        }
+      }
+    }
+    return EMPTY_MODEL
   }
 
   private fun createModelFromImportedModelInfo(info: ImportedModel): Model {

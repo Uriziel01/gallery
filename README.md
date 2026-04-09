@@ -1,87 +1,84 @@
-# Google AI Edge Gallery ✨
+# Google AI Edge Gallery - OpenAI-Compatible Server Extension
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![GitHub release (latest by date)](https://img.shields.io/github/v/release/google-ai-edge/gallery)](https://github.com/google-ai-edge/gallery/releases)
+This fork adds an **OpenAI-compatible HTTP server endpoint** to Google AI Edge Gallery, enabling the app to serve as a local inference server for external clients.
 
-**Explore, Experience, and Evaluate the Future of On-Device Generative AI with Google AI Edge.**
+## What's New
 
-AI Edge Gallery is the premier destination for running the world's most powerful open-source Large Language Models (LLMs) on your mobile device. Experience high-performance Generative AI directly on your hardware—fully offline, private, and lightning-fast.
+This implementation adds the ability to run an on-device OpenAI-compatible API server directly on your Android device, allowing external applications to interact with locally-running LLM models through standard OpenAI API patterns.
 
-**Now Featuring: Gemma 4**
+### Key Features
 
-The latest version brings official support for the newly released Gemma 4 family. As the centerpiece of this release, Gemma 4 allows you to test the cutting edge of on-device AI. Experience advanced reasoning, logic, and creative capabilities without ever sending your data to a server.
+- **HTTP Server**: NanoHTTPD-based foreground service running on a configurable port
+- **OpenAI API Endpoints**:
+  - `GET /v1/models` - List available models
+  - `POST /v1/chat/completions` - Chat completions (streaming & non-streaming)
+  - `POST /v1/responses` - OpenAI Responses API
+  - `GET /health` - Health check endpoint
+- **Bearer Token Authentication**: Configurable API key protection
+- **100% On-Device**: All inference happens locally on the device
 
+## Purpose
 
-| **Install the app today from Google Play** | **Install the app today from App Store** |
-| :--- | :--- |
-| <a href='https://play.google.com/store/apps/details?id=com.google.ai.edge.gallery'><img alt='Get it on Google Play' height="120" src='https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png'/></a> | <a href="https://apps.apple.com/us/app/google-ai-edge-gallery/id6749645337?itscg=30200&itsct=apps_box_badge&mttnsubad=6749645337" style="display: inline-block;"> <img src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us?releaseDate=1771977600" alt="Download on the App Store" style="width: 246px; height: 90px; vertical-align: middle; object-fit: contain;" /></a> |
+This extension enables:
 
-For users without Google Play access, install the apk from the [**latest release**](https://github.com/google-ai-edge/gallery/releases/latest/)
+1. **Phone as a Server**: Use your Android device as a local AI inference server
+2. **External Integrations**: Connect external tools, scripts, or applications to on-device models
+3. **Development & Testing**: Test OpenAI-compatible applications against local models
+4. **Privacy-First AI**: All data stays on-device - no cloud dependencies
 
+## Architecture
 
-## App Preview
+```
+External Client (curl/SDK)
+        ↓
+NanoHTTPD HTTP Server (Foreground Service)
+        ↓
+OpenAI Gateway (Request/Response Translation)
+        ↓
+LiteRT-LM (On-device inference)
+```
 
-<img width="480" alt="01" src="https://github.com/user-attachments/assets/a809ad78-aef4-4169-91ee-de7213cbb3bd" />
-<img width="480" alt="02" src="https://github.com/user-attachments/assets/1effd10d-f45a-4f7b-9435-f50f1bdd36b6" />
-<img width="480" alt="03" src="https://github.com/user-attachments/assets/e5089e41-2c18-4fbe-9011-ebe9e5a02044" />
-<img width="480" alt="04" src="https://github.com/user-attachments/assets/0f39d3ed-7403-4606-a7c6-b2c7e51ba6c1" />
-<img width="480" alt="05" src="https://github.com/user-attachments/assets/8c229e96-b598-4735-9f60-e96907e1d5d5" />
-<img width="480" alt="06" src="https://github.com/user-attachments/assets/ac9fb77b-81de-4197-9ed3-f6fe58290b3e" />
-<img width="480" alt="07" src="https://github.com/user-attachments/assets/bc86ba07-2eaf-49b1-980f-8a87a85c596f" />
-<img width="480" alt="08" src="https://github.com/user-attachments/assets/061564ed-030f-4630-810b-13a7863fce4c" />
+## Configuration
 
-## ✨ Core Features
+The server can be configured via the app settings:
+- **Port**: Custom port (default: 8080)
+- **Bearer Token**: API key authentication
 
-* **Agent Skills**: Transform your LLM from a conversationalist into a proactive assistant. Use the Agent Skills tile to augment model capabilities with tools like Wikipedia for fact-grounding, interactive maps, and rich visual summary cards. You can even load modular skills from a URL or browse community contributions on GitHub Discussions.
+## API Examples
 
-* **AI Chat with Thinking Mode**: Engage in fluid, multi-turn conversations and toggle the new Thinking Mode to peek "under the hood." This feature allows you to see the model’s step-by-step reasoning process, which is perfect for understanding complex problem-solving. Note: Thinking Mode currently works with supported models, starting with the Gemma 4 family.
+### List Models
+```bash
+curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8080/v1/models
+```
 
-* **Ask Image**: Use multimodal power to identify objects, solve visual puzzles, or get detailed descriptions using your device’s camera or photo gallery.
+### Chat Completion
+```bash
+curl -X POST http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "gemma-3-1b-it", "messages": [{"role": "user", "content": "Hello!"}]}'
+```
 
-* **Audio Scribe**: Transcribe and translate voice recordings into text in real-time using high-efficiency on-device language models.
+### Streaming
+```bash
+curl -X POST http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "gemma-3-1b-it", "messages": [{"role": "user", "content": "Count to 5"}], "stream": true}'
+```
 
-* **Prompt Lab**: A dedicated workspace to test different prompts and single-turn use cases with granular control over model parameters like temperature and top-k.
+## Documentation
 
-* **Mobile Actions**: Unlock offline device controls and automated tasks powered entirely by a finetune of FuntionGemma 270m.
+See the `docs/` directory for detailed specifications:
+- `openai-phone-endpoint-spec.md` - API specification
+- `openai-phone-endpoint-guide.md` - Usage guide
+- `openai-phone-endpoint-plan.md` - Implementation plan
+- `openai-phone-endpoint-orchestrator-prompt.md` - Orchestrator configuration
 
-* **Tiny Garden**: A fun, experimental mini-game that uses natural language to plant and harvest a virtual garden using a finetune of FunctionGemma 270m.
+## Building
 
-* **Model Management & Benchmark**: Gallery is a flexible sandbox for a wide variety of open-source models. Easily download models from the list or load your own custom models. Manage your model library effortlessly and run benchmark tests to understand exactly how each model performs on your specific hardware.
+This is a fork of the main Google AI Edge Gallery project. See [DEVELOPMENT.md](DEVELOPMENT.md) for build instructions.
 
-* **100% On-Device Privacy**: All model inferences happen directly on your device hardware. No internet is required, ensuring total privacy for your prompts, images, and sensitive data.
+## License
 
-## 🏁 Get Started in Minutes!
-
-1. **Check OS Requirement**: Android 12 and up, and iOS 17 and up.
-2.  **Download the App:**
-    - Install the app from [Google Play](https://play.google.com/store/apps/details?id=com.google.ai.edge.gallery) or [App Store](https://apps.apple.com/us/app/google-ai-edge-gallery/id6749645337).
-    - For users without Google Play access: install the apk from the [**latest release**](https://github.com/google-ai-edge/gallery/releases/latest/)
-3.  **Install & Explore:** For detailed installation instructions (including for corporate devices) and a full user guide, head over to our [**Project Wiki**](https://github.com/google-ai-edge/gallery/wiki)!
-
-## 🛠️ Technology Highlights
-
-*   **Google AI Edge:** Core APIs and tools for on-device ML.
-*   **LiteRT:** Lightweight runtime for optimized model execution.
-*   **Hugging Face Integration:** For model discovery and download.
-
-## ⌨️ Development
-
-Check out the [development notes](DEVELOPMENT.md) for instructions about how to build the app locally.
-
-## 🤝 Feedback
-
-This is an **experimental Beta release**, and your input is crucial!
-
-*   🐞 **Found a bug?** [Report it here!](https://github.com/google-ai-edge/gallery/issues/new?assignees=&labels=bug&template=bug_report.md&title=%5BBUG%5D)
-*   💡 **Have an idea?** [Suggest a feature!](https://github.com/google-ai-edge/gallery/issues/new?assignees=&labels=enhancement&template=feature_request.md&title=%5BFEATURE%5D)
-
-## 📄 License
-
-Licensed under the Apache License, Version 2.0. See the [LICENSE](LICENSE) file for details.
-
-## 🔗 Useful Links
-
-*   [**Project Wiki (Detailed Guides)**](https://github.com/google-ai-edge/gallery/wiki)
-*   [Hugging Face LiteRT Community](https://huggingface.co/litert-community)
-*   [LiteRT-LM](https://github.com/google-ai-edge/LiteRT-LM)
-*   [Google AI Edge Documentation](https://ai.google.dev/edge)
+Apache License 2.0 - same as the main project.

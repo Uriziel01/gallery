@@ -47,6 +47,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MultiChoiceSegmentedButtonRow
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -69,6 +70,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.google.ai.edge.gallery.BuildConfig
@@ -102,10 +104,22 @@ fun SettingsDialog(
       .withLocale(Locale.getDefault())
   }
   var customHfToken by remember { mutableStateOf("") }
+  var openAiServerEnabled by remember { mutableStateOf(modelManagerViewModel.isOpenAiServerEnabled()) }
+  var openAiServerPort by remember { mutableStateOf(modelManagerViewModel.getOpenAiServerPort().toString()) }
+  var openAiBearerToken by remember { mutableStateOf(modelManagerViewModel.getOpenAiServerBearerToken()) }
   var isFocused by remember { mutableStateOf(false) }
   val focusRequester = remember { FocusRequester() }
   val interactionSource = remember { MutableInteractionSource() }
   var showTos by remember { mutableStateOf(false) }
+
+  val persistOpenAiServerConfig: () -> Unit = {
+    val normalizedPort =
+      openAiServerPort.toIntOrNull()?.coerceIn(1, 65535)
+        ?: modelManagerViewModel.getOpenAiServerPort()
+    openAiServerPort = normalizedPort.toString()
+    modelManagerViewModel.saveOpenAiServerPort(normalizedPort)
+    modelManagerViewModel.saveOpenAiServerBearerToken(openAiBearerToken.trim())
+  }
 
   Dialog(onDismissRequest = onDismissed) {
     val focusManager = LocalFocusManager.current
@@ -287,6 +301,64 @@ fun SettingsDialog(
                     }
                   }
                 }
+              }
+            }
+          }
+
+          // OpenAI-compatible endpoint controls.
+          Column(
+            modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {},
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+          ) {
+            Text(
+              "OpenAI-compatible endpoint",
+              style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium),
+            )
+            Text(
+              if (openAiServerEnabled) "Status: running" else "Status: stopped",
+              style = MaterialTheme.typography.bodyMedium,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+              value = openAiServerPort,
+              onValueChange = { value -> openAiServerPort = value.filter { it.isDigit() }.take(5) },
+              label = { Text("Port") },
+              singleLine = true,
+              keyboardOptions =
+                KeyboardOptions(
+                  imeAction = ImeAction.Done,
+                  keyboardType = KeyboardType.Number,
+                ),
+            )
+            OutlinedTextField(
+              value = openAiBearerToken,
+              onValueChange = { value -> openAiBearerToken = value },
+              label = { Text("Bearer token") },
+              singleLine = true,
+              keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+              OutlinedButton(onClick = { persistOpenAiServerConfig() }) { Text("Save config") }
+              OutlinedButton(
+                onClick = {
+                  persistOpenAiServerConfig()
+                  modelManagerViewModel.setOpenAiServerEnabled(true)
+                  modelManagerViewModel.startOpenAiServer(context)
+                  openAiServerEnabled = true
+                },
+                enabled = !openAiServerEnabled,
+              ) {
+                Text("Start")
+              }
+              OutlinedButton(
+                onClick = {
+                  modelManagerViewModel.setOpenAiServerEnabled(false)
+                  modelManagerViewModel.stopOpenAiServer(context)
+                  openAiServerEnabled = false
+                },
+                enabled = openAiServerEnabled,
+              ) {
+                Text("Stop")
               }
             }
           }

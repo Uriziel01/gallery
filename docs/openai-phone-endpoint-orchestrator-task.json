@@ -1,0 +1,238 @@
+{
+  "task_name": "openai_phone_endpoint_orchestration",
+  "version": "1.0",
+  "source_of_truth": [
+    "docs/openai-phone-endpoint-plan.md",
+    "docs/openai-phone-endpoint-orchestrator-prompt.md"
+  ],
+  "mode": "sequential_one_step_at_a_time",
+  "environment": {
+    "host_os": "Bazzite Linux",
+    "host_characteristics": [
+      "immutable",
+      "atomic Fedora-based"
+    ],
+    "distrobox_container": "gallery-openai",
+    "instructions": [
+      "Assume all build and test work runs inside the Distrobox container.",
+      "Write shell and tooling instructions for the container, not the host.",
+      "Treat host-level package changes as out of scope unless explicitly required."
+    ]
+  },
+  "hard_rules": [
+    "Do not skip steps.",
+    "Do not implement code in the main agent.",
+    "Spawn exactly one sub-agent per step unless the step is explicitly decomposed.",
+    "Do not overlap file ownership between steps.",
+    "Do not advance until the current step's exit criteria are met.",
+    "Keep v1 limited to OpenAI-compatible chat completions, text-only, SSE streaming, and basic bearer-token auth."
+  ],
+  "orchestration_loop": [
+    "Read the current step from docs/openai-phone-endpoint-plan.md.",
+    "Spawn a sub-agent for the current step.",
+    "Assign only the files and responsibilities listed for that step.",
+    "Tell the sub-agent not to revert or touch unrelated files.",
+    "Wait for completion.",
+    "Review the result against the step exit criteria.",
+    "If the step passes, continue to the next step.",
+    "If the step fails, send a precise fix request or stop if blocked."
+  ],
+  "step_order": [
+    {
+      "step": 1,
+      "title": "Scope lock and API contract",
+      "ownership": [
+        "docs/openai-phone-endpoint-plan.md",
+        "docs/openai-phone-endpoint-orchestrator-prompt.md"
+      ],
+      "allowed_changes": [
+        "documentation",
+        "spec text"
+      ],
+      "exit_criteria": [
+        "Supported OpenAI API surface is explicit.",
+        "Unsupported features are explicit.",
+        "Auth and error model are explicit."
+      ],
+      "subagent_prompt": "Create or refine the v1 API contract only. Do not touch code. Freeze the supported OpenAI surface, request/response shapes, auth model, and unsupported features."
+    },
+    {
+      "step": 2,
+      "title": "Add transport dependency and build plumbing",
+      "ownership": [
+        "Android/src/app/build.gradle.kts",
+        "Android/src/settings.gradle.kts",
+        "gradle/libs.versions.toml"
+      ],
+      "allowed_changes": [
+        "build files",
+        "dependency declarations"
+      ],
+      "exit_criteria": [
+        "Chosen HTTP server dependency is declared.",
+        "The app module still assembles.",
+        "No server behavior is introduced yet."
+      ],
+      "subagent_prompt": "Add the HTTP server dependency and any minimal parsing helpers needed. Do not add server behavior."
+    },
+    {
+      "step": 3,
+      "title": "Extract server-facing model access",
+      "ownership": [
+        "Android/src/app/src/main/java/com/google/ai/edge/gallery/server/**",
+        "Android/src/app/src/main/java/com/google/ai/edge/gallery/ui/modelmanager/ModelManagerViewModel.kt",
+        "Android/src/app/src/main/java/com/google/ai/edge/gallery/data/Model.kt",
+        "Android/src/app/src/main/java/com/google/ai/edge/gallery/customtasks/common/CustomTask.kt"
+      ],
+      "allowed_changes": [
+        "new server access layer",
+        "minimal support refactors"
+      ],
+      "exit_criteria": [
+        "A service-side caller can resolve the selected model.",
+        "A service-side caller can initialize and clean up a model.",
+        "The solution does not depend on a ViewModel."
+      ],
+      "subagent_prompt": "Create a non-UI server-facing model access layer that can resolve, initialize, and clean up models without depending on a ViewModel. Keep changes minimal and isolated."
+    },
+    {
+      "step": 4,
+      "title": "Add OpenAI DTOs and mapping helpers",
+      "ownership": [
+        "Android/src/app/src/main/java/com/google/ai/edge/gallery/server/openai/**"
+      ],
+      "allowed_changes": [
+        "DTO files",
+        "pure mapping helpers",
+        "validation helpers"
+      ],
+      "exit_criteria": [
+        "Request and response DTOs exist.",
+        "Serialization round-trips in tests.",
+        "No server I/O is introduced."
+      ],
+      "subagent_prompt": "Create OpenAI-compatible DTOs and pure mapping helpers only. No server I/O and no runtime changes."
+    },
+    {
+      "step": 5,
+      "title": "Add a stateless inference gateway",
+      "ownership": [
+        "Android/src/app/src/main/java/com/google/ai/edge/gallery/server/gateway/**",
+        "Android/src/app/src/main/java/com/google/ai/edge/gallery/runtime/LlmModelHelper.kt",
+        "Android/src/app/src/main/java/com/google/ai/edge/gallery/ui/llmchat/LlmChatModelHelper.kt"
+      ],
+      "allowed_changes": [
+        "gateway files",
+        "small runtime hooks if needed"
+      ],
+      "exit_criteria": [
+        "One request maps to one inference run.",
+        "Access is serialized.",
+        "UI chat state remains separate."
+      ],
+      "subagent_prompt": "Create the stateless inference gateway that translates one OpenAI chat request into one LiteRT-LM inference run. Serialize access and keep it separate from the UI chat session."
+    },
+    {
+      "step": 6,
+      "title": "Scaffold the foreground service and lifecycle",
+      "ownership": [
+        "Android/src/app/src/main/java/com/google/ai/edge/gallery/server/service/**",
+        "Android/src/app/src/main/AndroidManifest.xml"
+      ],
+      "allowed_changes": [
+        "service files",
+        "manifest registration",
+        "notification setup"
+      ],
+      "exit_criteria": [
+        "Service starts and stops cleanly.",
+        "Foreground notification is created.",
+        "Minimal health endpoint exists."
+      ],
+      "subagent_prompt": "Add the foreground service shell that owns the HTTP server and registers it in the manifest. Include lifecycle and notification scaffolding only."
+    },
+    {
+      "step": 7,
+      "title": "Implement GET /v1/models",
+      "ownership": [
+        "Android/src/app/src/main/java/com/google/ai/edge/gallery/server/routes/**"
+      ],
+      "allowed_changes": [
+        "models route only"
+      ],
+      "exit_criteria": [
+        "PC client receives valid OpenAI-shaped models response.",
+        "Only actually-servable models are reported."
+      ],
+      "subagent_prompt": "Implement only the GET /v1/models route. Keep the response OpenAI-compatible and limited to servable models."
+    },
+    {
+      "step": 8,
+      "title": "Implement non-streaming POST /v1/chat/completions",
+      "ownership": [
+        "Android/src/app/src/main/java/com/google/ai/edge/gallery/server/routes/**"
+      ],
+      "allowed_changes": [
+        "non-streaming chat completions route"
+      ],
+      "exit_criteria": [
+        "A client can get a full completion over HTTP.",
+        "Request parsing and validation work."
+      ],
+      "subagent_prompt": "Implement only the non-streaming POST /v1/chat/completions route. Parse the request, call the inference gateway, and return the OpenAI-shaped JSON response."
+    },
+    {
+      "step": 9,
+      "title": "Implement SSE streaming for POST /v1/chat/completions",
+      "ownership": [
+        "Android/src/app/src/main/java/com/google/ai/edge/gallery/server/routes/**"
+      ],
+      "allowed_changes": [
+        "SSE streaming path for chat completions"
+      ],
+      "exit_criteria": [
+        "Streaming clients receive incremental deltas.",
+        "Stream ends with [DONE]."
+      ],
+      "subagent_prompt": "Implement only the SSE streaming path for POST /v1/chat/completions. Emit OpenAI-style delta chunks and terminate with [DONE]."
+    },
+    {
+      "step": 10,
+      "title": "Add config, authentication, and UI control",
+      "ownership": [
+        "Android/src/app/src/main/java/com/google/ai/edge/gallery/server/config/**",
+        "Android/src/app/src/main/java/com/google/ai/edge/gallery/ui/**"
+      ],
+      "allowed_changes": [
+        "server config storage",
+        "UI controls",
+        "auth token handling"
+      ],
+      "exit_criteria": [
+        "Server can be intentionally enabled/disabled.",
+        "Port and bearer token are persisted.",
+        "Model selection is visible to the user."
+      ],
+      "subagent_prompt": "Add server config storage and UI control for enabling, disabling, and configuring the endpoint. Keep auth simple and persistent."
+    },
+    {
+      "step": 11,
+      "title": "Add tests and docs",
+      "ownership": [
+        "Android/src/app/src/test/**",
+        "Android/src/app/src/androidTest/**",
+        "docs/**"
+      ],
+      "allowed_changes": [
+        "tests",
+        "usage docs"
+      ],
+      "exit_criteria": [
+        "DTO mapping and request validation are covered.",
+        "Single-flight behavior is covered.",
+        "Connection guide exists."
+      ],
+      "subagent_prompt": "Add tests and docs only. Cover DTO mapping, validation, single-flight behavior, and a short PC connection guide."
+    }
+  ]
+}
